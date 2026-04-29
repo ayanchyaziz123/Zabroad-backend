@@ -3,18 +3,24 @@ from django.contrib.auth.models import User
 
 
 class JobListing(models.Model):
-    VISA_SPONSORSHIP = [('yes', 'Yes'), ('no', 'No'), ('maybe', 'Maybe')]
+    PLAN_CHOICES = [
+        ('free',     'Free'),
+        ('standard', 'Standard'),
+        ('premium',  'Premium'),
+    ]
 
-    posted_by        = models.ForeignKey(User, on_delete=models.CASCADE, related_name='jobs')
-    title            = models.CharField(max_length=200)
-    company          = models.CharField(max_length=200)
-    location         = models.CharField(max_length=100)
-    description      = models.TextField()
-    visa_sponsorship = models.CharField(max_length=10, choices=VISA_SPONSORSHIP, default='no')
-    salary_range     = models.CharField(max_length=100, blank=True)
-    apply_link       = models.URLField(blank=True)
-    is_active        = models.BooleanField(default=True)
-    created_at       = models.DateTimeField(auto_now_add=True)
+    posted_by    = models.ForeignKey(User, on_delete=models.CASCADE, related_name='jobs')
+    title        = models.CharField(max_length=200)
+    company      = models.CharField(max_length=200)
+    location     = models.CharField(max_length=200)
+    description  = models.TextField()
+    plan         = models.CharField(max_length=20, choices=PLAN_CHOICES, default='free')
+    home_country = models.CharField(max_length=100, blank=True)   # poster's home country name
+    country_flag = models.CharField(max_length=10,  blank=True)   # emoji flag
+    posted_from  = models.CharField(max_length=200, blank=True)   # poster's current city/area
+    is_hot       = models.BooleanField(default=False)
+    is_active    = models.BooleanField(default=True)
+    created_at   = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['-created_at']

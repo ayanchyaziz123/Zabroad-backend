@@ -112,6 +112,10 @@ CORS_ALLOW_ALL_ORIGINS = True
 EMAIL_BACKEND      = 'django.core.mail.backends.console.EmailBackend'
 DEFAULT_FROM_EMAIL = 'Zabroad <noreply@zabroad.com>'
 
+# ── Stripe ───────────────────────────────────────────────────────────────────
+STRIPE_SECRET_KEY      = 'sk_test_YOUR_SECRET_KEY'       # replace with your key
+STRIPE_PUBLISHABLE_KEY = 'pk_test_YOUR_PUBLISHABLE_KEY'  # replace with your key
+
 # ── Auth backends — allow email login ────────────────────────────────────────
 AUTHENTICATION_BACKENDS = [
     'accounts.auth_backend.EmailBackend',

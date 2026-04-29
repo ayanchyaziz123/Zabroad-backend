@@ -8,11 +8,10 @@ class HousingListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
-        qs = HousingListing.objects.filter(is_active=True).select_related('posted_by')
-        if self.request.query_params.get('no_credit_check'):
-            qs = qs.filter(no_credit_check=True)
-        if self.request.query_params.get('accepts_itin'):
-            qs = qs.filter(accepts_itin=True)
+        qs      = HousingListing.objects.filter(is_active=True).select_related('posted_by')
+        country = self.request.query_params.get('community')
+        if country:
+            qs = qs.filter(home_country__iexact=country)
         return qs
 
     def perform_create(self, serializer):
@@ -22,4 +21,4 @@ class HousingListCreateView(generics.ListCreateAPIView):
 class HousingDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class   = HousingListingSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-    queryset           = HousingListing.objects.all()
+    queryset           = HousingListing.objects.filter(is_active=True)

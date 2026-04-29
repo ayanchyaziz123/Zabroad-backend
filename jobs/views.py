@@ -8,10 +8,10 @@ class JobListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
-        qs   = JobListing.objects.filter(is_active=True).select_related('posted_by')
-        visa = self.request.query_params.get('visa_sponsorship')
-        if visa:
-            qs = qs.filter(visa_sponsorship=visa)
+        qs      = JobListing.objects.filter(is_active=True).select_related('posted_by')
+        country = self.request.query_params.get('community')
+        if country:
+            qs = qs.filter(home_country__iexact=country)
         return qs
 
     def perform_create(self, serializer):
@@ -21,4 +21,4 @@ class JobListCreateView(generics.ListCreateAPIView):
 class JobDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class   = JobListingSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-    queryset           = JobListing.objects.all()
+    queryset           = JobListing.objects.filter(is_active=True)
