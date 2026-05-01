@@ -41,10 +41,31 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 class ProfileSerializer(serializers.ModelSerializer):
+    avatar_url = serializers.SerializerMethodField()
+    cover_url  = serializers.SerializerMethodField()
+
     class Meta:
         model  = Profile
-        fields = ['handle', 'avatar_emoji', 'home_country', 'country_flag',
+        fields = ['handle', 'avatar_emoji', 'avatar', 'cover',
+                  'avatar_url', 'cover_url',
+                  'home_country', 'country_flag',
                   'lives_in', 'visa_status', 'bio']
+        extra_kwargs = {
+            'avatar': {'write_only': True, 'required': False},
+            'cover':  {'write_only': True, 'required': False},
+        }
+
+    def get_avatar_url(self, obj):
+        if not obj.avatar:
+            return None
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj.avatar.url) if request else obj.avatar.url
+
+    def get_cover_url(self, obj):
+        if not obj.cover:
+            return None
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj.cover.url) if request else obj.cover.url
 
 
 class UserSerializer(serializers.ModelSerializer):

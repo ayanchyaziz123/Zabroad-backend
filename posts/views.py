@@ -2,7 +2,7 @@ from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
-from .models import Post, Like, Comment
+from .models import Post, Like, Comment, SavedPost
 from .serializers import PostSerializer, CommentSerializer
 
 
@@ -24,6 +24,14 @@ class PostListCreateView(generics.ListCreateAPIView):
             qs = qs.filter(location__icontains=location)
         if country:
             qs = qs.filter(country__iexact=country)
+        search = self.request.query_params.get('search')
+        if search:
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(body__icontains=search) |
+                Q(topics__topic__icontains=search) |
+                Q(location__icontains=search)
+            ).distinct()
         return qs
 
     def get_serializer_context(self):
@@ -63,12 +71,46 @@ def toggle_like(request, pk):
     return Response({'liked': True, 'likes_count': post.likes_count})
 
 
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def saved_posts(request):
+    """Return all posts saved by the current user."""
+    post_ids = SavedPost.objects.filter(user=request.user).values_list('post_id', flat=True)
+    posts = (
+        Post.objects
+        .filter(id__in=post_ids)
+        .select_related('author__profile')
+        .prefetch_related('topics', 'likes', 'comments')
+        .order_by('-created_at')
+    )
+    serializer = PostSerializer(posts, many=True, context={'request': request})
+    return Response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def toggle_save(request, pk):
+    try:
+        post = Post.objects.get(pk=pk)
+    except Post.DoesNotExist:
+        return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    save, created = SavedPost.objects.get_or_create(user=request.user, post=post)
+    if not created:
+        save.delete()
+        return Response({'saved': False})
+    return Response({'saved': True})
+
+
 class CommentListCreateView(generics.ListCreateAPIView):
     serializer_class   = CommentSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
         return Comment.objects.filter(post_id=self.kwargs['pk']).select_related('author__profile')
+
+    def get_serializer_context(self):
+        return {'request': self.request}
 
     def perform_create(self, serializer):
         post = Post.objects.get(pk=self.kwargs['pk'])

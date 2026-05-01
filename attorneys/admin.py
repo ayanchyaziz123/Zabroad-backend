@@ -4,8 +4,8 @@ from .models import AttorneyListing
 
 @admin.register(AttorneyListing)
 class AttorneyListingAdmin(admin.ModelAdmin):
-    list_display    = ['name', 'firm', 'location', 'visa_types', 'plan', 'is_verified', 'free_consult', 'created_at']
-    list_filter     = ['plan', 'is_verified', 'free_consult']
-    search_fields   = ['name', 'firm', 'location', 'visa_types', 'user__email']
-    readonly_fields = ['created_at']
-    list_editable   = ['is_verified', 'plan']
+    list_display  = ('name', 'firm', 'location', 'plan', 'home_country', 'is_featured', 'is_active', 'created_at')
+    list_filter   = ('plan', 'is_featured', 'is_active', 'home_country')
+    search_fields = ('name', 'firm', 'location', 'home_country', 'posted_by__username')
+    ordering      = ('-created_at',)
+    list_editable = ('is_active',)

@@ -1,14 +1,18 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
-import random
+import secrets
 
 
 class OTPVerification(models.Model):
-    email      = models.EmailField()
-    code       = models.CharField(max_length=6)
-    created_at = models.DateTimeField(auto_now_add=True)
-    is_used    = models.BooleanField(default=False)
+    MAX_ATTEMPTS = 5
+
+    email       = models.EmailField()
+    code        = models.CharField(max_length=6)
+    created_at  = models.DateTimeField(auto_now_add=True)
+    is_used     = models.BooleanField(default=False)
+    attempts    = models.PositiveSmallIntegerField(default=0)
+    verified_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['-created_at']
@@ -16,10 +20,15 @@ class OTPVerification(models.Model):
     def is_expired(self):
         return (timezone.now() - self.created_at).total_seconds() > 600  # 10 min
 
+    def is_locked(self):
+        return self.attempts >= self.MAX_ATTEMPTS
+
     @classmethod
     def generate(cls, email):
+        # Invalidate all previous unused OTPs for this email
         cls.objects.filter(email=email, is_used=False).update(is_used=True)
-        code = str(random.randint(100000, 999999))
+        # Use secrets for cryptographically secure random code
+        code = str(secrets.randbelow(900000) + 100000)
         return cls.objects.create(email=email, code=code)
 
     def __str__(self):
@@ -36,6 +45,8 @@ class Profile(models.Model):
     user         = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     handle       = models.CharField(max_length=50, unique=True)
     avatar_emoji = models.CharField(max_length=10, default='🧑‍💻')
+    avatar       = models.ImageField(upload_to='profiles/avatars/', null=True, blank=True)
+    cover        = models.ImageField(upload_to='profiles/covers/',  null=True, blank=True)
     home_country = models.CharField(max_length=100, default='Bangladesh')
     country_flag = models.CharField(max_length=10, default='🇧🇩')
     lives_in     = models.CharField(max_length=100, default='Queens, NY')

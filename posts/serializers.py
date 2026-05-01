@@ -9,13 +9,14 @@ class TopicSerializer(serializers.ModelSerializer):
 
 
 class CommentSerializer(serializers.ModelSerializer):
-    author_name   = serializers.SerializerMethodField()
-    author_handle = serializers.SerializerMethodField()
-    author_avatar = serializers.SerializerMethodField()
+    author_name       = serializers.SerializerMethodField()
+    author_handle     = serializers.SerializerMethodField()
+    author_avatar     = serializers.SerializerMethodField()
+    author_avatar_url = serializers.SerializerMethodField()
 
     class Meta:
         model  = Comment
-        fields = ['id', 'author_name', 'author_handle', 'author_avatar', 'body', 'created_at']
+        fields = ['id', 'author_name', 'author_handle', 'author_avatar', 'author_avatar_url', 'body', 'created_at']
 
     def get_author_name(self, obj):
         return obj.author.get_full_name() or obj.author.username
@@ -26,28 +27,41 @@ class CommentSerializer(serializers.ModelSerializer):
     def get_author_avatar(self, obj):
         return getattr(obj.author, 'profile', None) and obj.author.profile.avatar_emoji or '🧑‍💻'
 
+    def get_author_avatar_url(self, obj):
+        profile = getattr(obj.author, 'profile', None)
+        if not profile or not profile.avatar:
+            return None
+        request = self.context.get('request')
+        return request.build_absolute_uri(profile.avatar.url) if request else profile.avatar.url
+
 
 class PostSerializer(serializers.ModelSerializer):
     topics        = serializers.ListField(child=serializers.CharField(), write_only=True, required=False)
     topics_list   = serializers.SerializerMethodField()
-    author_name   = serializers.SerializerMethodField()
-    author_handle = serializers.SerializerMethodField()
-    author_avatar = serializers.SerializerMethodField()
+    author_name       = serializers.SerializerMethodField()
+    author_handle     = serializers.SerializerMethodField()
+    author_avatar     = serializers.SerializerMethodField()
+    author_avatar_url = serializers.SerializerMethodField()
     author_country_flag = serializers.SerializerMethodField()
+    author_id     = serializers.SerializerMethodField()
     likes_count   = serializers.ReadOnlyField()
     comments_count = serializers.ReadOnlyField()
     is_liked      = serializers.SerializerMethodField()
+    is_saved      = serializers.SerializerMethodField()
 
     class Meta:
         model  = Post
         fields = [
             'id', 'body', 'location', 'country', 'scope', 'is_anonymous',
-            'author_name', 'author_handle', 'author_avatar', 'author_country_flag',
+            'author_id', 'author_name', 'author_handle', 'author_avatar', 'author_avatar_url', 'author_country_flag',
             'topics', 'topics_list',
-            'likes_count', 'comments_count', 'is_liked',
+            'likes_count', 'comments_count', 'is_liked', 'is_saved',
             'created_at',
         ]
         read_only_fields = ['created_at']
+
+    def get_author_id(self, obj):
+        return None if obj.is_anonymous else obj.author_id
 
     def get_author_name(self, obj):
         if obj.is_anonymous:
@@ -64,6 +78,15 @@ class PostSerializer(serializers.ModelSerializer):
             return '🕵️'
         return getattr(obj.author, 'profile', None) and obj.author.profile.avatar_emoji or '🧑‍💻'
 
+    def get_author_avatar_url(self, obj):
+        if obj.is_anonymous:
+            return None
+        profile = getattr(obj.author, 'profile', None)
+        if not profile or not profile.avatar:
+            return None
+        request = self.context.get('request')
+        return request.build_absolute_uri(profile.avatar.url) if request else profile.avatar.url
+
     def get_author_country_flag(self, obj):
         return getattr(obj.author, 'profile', None) and obj.author.profile.country_flag or ''
 
@@ -74,6 +97,12 @@ class PostSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
             return obj.likes.filter(user=request.user).exists()
+        return False
+
+    def get_is_saved(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.saves.filter(user=request.user).exists()
         return False
 
     def create(self, validated_data):

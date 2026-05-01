@@ -8,17 +8,17 @@ class AttorneyListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
-        qs        = AttorneyListing.objects.select_related('user')
-        visa_type = self.request.query_params.get('visa_type')
-        if visa_type:
-            qs = qs.filter(visa_types__icontains=visa_type)
+        qs      = AttorneyListing.objects.filter(is_active=True).select_related('posted_by')
+        country = self.request.query_params.get('community')
+        if country:
+            qs = qs.filter(home_country__iexact=country)
         return qs
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        serializer.save(posted_by=self.request.user)
 
 
 class AttorneyDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class   = AttorneyListingSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-    queryset           = AttorneyListing.objects.all()
+    queryset           = AttorneyListing.objects.filter(is_active=True)
