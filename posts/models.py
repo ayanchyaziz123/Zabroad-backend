@@ -12,6 +12,8 @@ class Post(models.Model):
     author       = models.ForeignKey(User, on_delete=models.CASCADE, related_name='posts')
     body         = models.TextField(max_length=500)
     location     = models.CharField(max_length=100, blank=True)   # GPS city, e.g. "Queens, NY"
+    latitude     = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude    = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     country      = models.CharField(max_length=100, blank=True)   # author's home country, e.g. "Bangladesh"
     scope        = models.CharField(max_length=20, choices=SCOPE_CHOICES, default='local')
     is_anonymous = models.BooleanField(default=False)

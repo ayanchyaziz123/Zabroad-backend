@@ -9,6 +9,7 @@ class HousingListingSerializer(serializers.ModelSerializer):
         model  = HousingListing
         fields = [
             'id', 'poster', 'title', 'price', 'location',
+            'latitude', 'longitude',
             'description', 'plan', 'home_country', 'country_flag',
             'posted_from', 'is_featured', 'is_active', 'created_at',
         ]

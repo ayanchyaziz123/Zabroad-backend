@@ -52,7 +52,7 @@ class PostSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Post
         fields = [
-            'id', 'body', 'location', 'country', 'scope', 'is_anonymous',
+            'id', 'body', 'location', 'latitude', 'longitude', 'country', 'scope', 'is_anonymous',
             'author_id', 'author_name', 'author_handle', 'author_avatar', 'author_avatar_url', 'author_country_flag',
             'topics', 'topics_list',
             'likes_count', 'comments_count', 'is_liked', 'is_saved',

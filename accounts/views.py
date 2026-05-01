@@ -131,19 +131,23 @@ def forgot_password(request):
     if not email or '@' not in email:
         return Response({'detail': 'Valid email is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Always return 200 so we don't leak whether an account exists
+    # Always return the same message to avoid email enumeration.
+    # Silently enforce rate limit and account existence check.
     if User.objects.filter(email=email).exists():
-        otp = OTPVerification.generate(email)
-        send_mail(
-            subject='Reset your Zabroad password',
-            message=(
-                f'Your Zabroad password-reset code is: {otp.code}\n\n'
-                f'This code expires in 10 minutes. If you did not request this, ignore this email.'
-            ),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[email],
-            fail_silently=False,
-        )
+        recent = OTPVerification.objects.filter(email=email).order_by('-created_at').first()
+        too_soon = recent and (timezone.now() - recent.created_at).total_seconds() < OTP_RATE_LIMIT_SECONDS
+        if not too_soon:
+            otp = OTPVerification.generate(email)
+            send_mail(
+                subject='Reset your Zabroad password',
+                message=(
+                    f'Your Zabroad password-reset code is: {otp.code}\n\n'
+                    f'This code expires in 10 minutes. If you did not request this, ignore this email.'
+                ),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[email],
+                fail_silently=False,
+            )
     return Response({'detail': 'If an account exists for that email, a reset code has been sent.'})
 
 

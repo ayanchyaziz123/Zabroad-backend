@@ -1,3 +1,4 @@
+from django.db.models import Case, When, Value, IntegerField
 from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
@@ -11,11 +12,15 @@ class PostListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
-        qs       = Post.objects.select_related('author__profile').prefetch_related('topics', 'likes', 'comments')
-        scope    = self.request.query_params.get('scope')
-        topic    = self.request.query_params.get('topic')
-        location = self.request.query_params.get('location')   # city filter, e.g. "Queens, NY"
-        country  = self.request.query_params.get('country')    # home-country filter, e.g. "Bangladesh"
+        qs        = Post.objects.select_related('author__profile').prefetch_related('topics', 'likes', 'comments')
+        scope     = self.request.query_params.get('scope')
+        topic     = self.request.query_params.get('topic')
+        location  = self.request.query_params.get('location')
+        country   = self.request.query_params.get('country')
+        author    = self.request.query_params.get('author')
+        search    = self.request.query_params.get('search')
+        near_city = self.request.query_params.get('near_city', '').strip()
+
         if scope:
             qs = qs.filter(scope=scope)
         if topic:
@@ -24,7 +29,11 @@ class PostListCreateView(generics.ListCreateAPIView):
             qs = qs.filter(location__icontains=location)
         if country:
             qs = qs.filter(country__iexact=country)
-        search = self.request.query_params.get('search')
+        if author:
+            if self.request.user.is_authenticated and str(self.request.user.id) == author:
+                qs = qs.filter(author_id=author)
+            else:
+                qs = qs.filter(author_id=author, is_anonymous=False)
         if search:
             from django.db.models import Q
             qs = qs.filter(
@@ -32,6 +41,24 @@ class PostListCreateView(generics.ListCreateAPIView):
                 Q(topics__topic__icontains=search) |
                 Q(location__icontains=search)
             ).distinct()
+
+        if near_city:
+            # Score posts by location relevance — city name extracted before the comma
+            # e.g. "Queens, NY" → city_prefix = "Queens"
+            city_prefix = near_city.split(',')[0].strip()
+            qs = qs.annotate(
+                loc_score=Case(
+                    When(location__iexact=near_city,         then=Value(4)),  # exact: "Queens, NY"
+                    When(location__istartswith=city_prefix,  then=Value(3)),  # "Queens…"
+                    When(location__icontains=city_prefix,    then=Value(2)),  # anywhere in location
+                    When(author__profile__lives_in__icontains=city_prefix, then=Value(1)),  # author lives near
+                    default=Value(0),
+                    output_field=IntegerField(),
+                )
+            ).order_by('-loc_score', '-created_at')
+        else:
+            qs = qs.order_by('-created_at')
+
         return qs
 
     def get_serializer_context(self):

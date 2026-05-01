@@ -55,6 +55,17 @@ class ProfileSerializer(serializers.ModelSerializer):
             'cover':  {'write_only': True, 'required': False},
         }
 
+    def validate_handle(self, value):
+        value = value.lstrip('@').strip()
+        if not value:
+            raise serializers.ValidationError('Handle cannot be empty.')
+        qs = Profile.objects.filter(handle=value)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError('This handle is already taken.')
+        return value
+
     def get_avatar_url(self, obj):
         if not obj.avatar:
             return None

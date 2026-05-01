@@ -49,7 +49,7 @@ class Profile(models.Model):
     cover        = models.ImageField(upload_to='profiles/covers/',  null=True, blank=True)
     home_country = models.CharField(max_length=100, default='Bangladesh')
     country_flag = models.CharField(max_length=10, default='🇧🇩')
-    lives_in     = models.CharField(max_length=100, default='Queens, NY')
+    lives_in     = models.CharField(max_length=100, blank=True, default='')
     visa_status  = models.CharField(max_length=20, choices=VISA_CHOICES, default='OPT')
     bio          = models.TextField(blank=True)
     created_at   = models.DateTimeField(auto_now_add=True)

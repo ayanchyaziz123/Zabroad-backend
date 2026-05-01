@@ -9,6 +9,7 @@ class JobListingSerializer(serializers.ModelSerializer):
         model  = JobListing
         fields = [
             'id', 'poster', 'title', 'company', 'location',
+            'latitude', 'longitude',
             'description', 'plan', 'home_country', 'country_flag',
             'posted_from', 'is_hot', 'is_active', 'created_at',
         ]

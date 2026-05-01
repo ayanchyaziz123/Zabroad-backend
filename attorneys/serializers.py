@@ -10,6 +10,7 @@ class AttorneyListingSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'poster', 'name', 'firm', 'location', 'languages',
             'specialty', 'price', 'description', 'plan',
+            'latitude', 'longitude',
             'home_country', 'country_flag', 'posted_from',
             'is_featured', 'is_active', 'created_at',
         ]

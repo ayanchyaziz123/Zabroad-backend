@@ -14,6 +14,8 @@ class DoctorListing(models.Model):
     phone            = models.CharField(max_length=30, blank=True)
     website          = models.URLField(blank=True)
     accepts_medicaid = models.BooleanField(default=False)
+    latitude         = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude        = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     plan             = models.CharField(max_length=10, choices=PLAN_CHOICES, default='free')
     is_verified      = models.BooleanField(default=False)
     created_at       = models.DateTimeField(auto_now_add=True)
