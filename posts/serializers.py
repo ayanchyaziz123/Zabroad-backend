@@ -48,17 +48,29 @@ class PostSerializer(serializers.ModelSerializer):
     comments_count = serializers.ReadOnlyField()
     is_liked      = serializers.SerializerMethodField()
     is_saved      = serializers.SerializerMethodField()
+    image         = serializers.ImageField(required=False, allow_null=True, write_only=True)
+    image_url     = serializers.SerializerMethodField()
 
     class Meta:
         model  = Post
         fields = [
             'id', 'body', 'location', 'latitude', 'longitude', 'country', 'scope', 'is_anonymous',
+            'image', 'image_url',
             'author_id', 'author_name', 'author_handle', 'author_avatar', 'author_avatar_url', 'author_country_flag',
             'topics', 'topics_list',
             'likes_count', 'comments_count', 'is_liked', 'is_saved',
             'created_at',
         ]
         read_only_fields = ['created_at']
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Never expose precise coordinates on anonymous posts — they could de-anonymize the author.
+        if instance.is_anonymous:
+            data['latitude']  = None
+            data['longitude'] = None
+            data['location']  = ''
+        return data
 
     def get_author_id(self, obj):
         return None if obj.is_anonymous else obj.author_id
@@ -99,6 +111,12 @@ class PostSerializer(serializers.ModelSerializer):
             return obj.likes.filter(user=request.user).exists()
         return False
 
+    def get_image_url(self, obj):
+        if not obj.image:
+            return None
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj.image.url) if request else obj.image.url
+
     def get_is_saved(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
@@ -111,3 +129,14 @@ class PostSerializer(serializers.ModelSerializer):
         for topic in topics:
             PostTopic.objects.create(post=post, topic=topic)
         return post
+
+    def update(self, instance, validated_data):
+        topics = validated_data.pop('topics', None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        if topics is not None:
+            instance.topics.all().delete()
+            for topic in topics:
+                PostTopic.objects.create(post=instance, topic=topic)
+        return instance

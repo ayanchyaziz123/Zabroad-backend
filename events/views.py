@@ -2,7 +2,8 @@ from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
-from .models import Event
+from zabroad_backend.permissions import IsOwnerOrReadOnly
+from .models import Event, EventRSVP
 from .serializers import EventSerializer
 
 
@@ -11,7 +12,7 @@ class EventListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
-        qs       = Event.objects.select_related('posted_by')
+        qs       = Event.objects.prefetch_related('rsvps').select_related('posted_by')
         category = self.request.query_params.get('category')
         if category:
             qs = qs.filter(category=category)
@@ -23,8 +24,8 @@ class EventListCreateView(generics.ListCreateAPIView):
 
 class EventDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class   = EventSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-    queryset           = Event.objects.all()
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly]
+    queryset           = Event.objects.prefetch_related('rsvps').select_related('posted_by')
 
 
 @api_view(['POST'])
@@ -34,6 +35,9 @@ def rsvp_event(request, pk):
         event = Event.objects.get(pk=pk)
     except Event.DoesNotExist:
         return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
-    event.rsvp_count += 1
-    event.save(update_fields=['rsvp_count'])
-    return Response({'rsvp_count': event.rsvp_count})
+
+    rsvp, created = EventRSVP.objects.get_or_create(event=event, user=request.user)
+    if not created:
+        rsvp.delete()
+        return Response({'rsvped': False, 'rsvp_count': event.rsvp_count})
+    return Response({'rsvped': True, 'rsvp_count': event.rsvp_count}, status=status.HTTP_201_CREATED)

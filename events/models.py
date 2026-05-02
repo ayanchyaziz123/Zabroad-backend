@@ -15,11 +15,23 @@ class Event(models.Model):
     date        = models.DateTimeField()
     description = models.TextField()
     is_free     = models.BooleanField(default=True)
-    rsvp_count  = models.PositiveIntegerField(default=0)
     created_at  = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['date']
 
+    @property
+    def rsvp_count(self):
+        return self.rsvps.count()
+
     def __str__(self):
         return f'{self.title} — {self.date.strftime("%b %d")}'
+
+
+class EventRSVP(models.Model):
+    event      = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='rsvps')
+    user       = models.ForeignKey(User,  on_delete=models.CASCADE, related_name='event_rsvps')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('event', 'user')

@@ -12,5 +12,7 @@ urlpatterns = [
     path("api/doctors/",   include("healthcare.urls")),
     path("api/attorneys/", include("attorneys.urls")),
     path("api/events/",    include("events.urls")),
-    path("api/chat/",      include("chat.urls")),
+    path("api/chat/",          include("chat.urls")),
+    path("api/notifications/", include("notifications.urls")),
+    path("api/marketplace/",   include("marketplace.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

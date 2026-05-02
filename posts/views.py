@@ -1,10 +1,15 @@
 from django.db.models import Case, When, Value, IntegerField
 from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
+from zabroad_backend.permissions import IsOwnerOrReadOnly
+from zabroad_backend.geo import apply_location_sort
 from .models import Post, Like, Comment, SavedPost
 from .serializers import PostSerializer, CommentSerializer
+
+_MAX_SEARCH_LEN = 100
 
 
 class PostListCreateView(generics.ListCreateAPIView):
@@ -12,14 +17,15 @@ class PostListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
-        qs        = Post.objects.select_related('author__profile').prefetch_related('topics', 'likes', 'comments')
-        scope     = self.request.query_params.get('scope')
-        topic     = self.request.query_params.get('topic')
-        location  = self.request.query_params.get('location')
-        country   = self.request.query_params.get('country')
-        author    = self.request.query_params.get('author')
-        search    = self.request.query_params.get('search')
-        near_city = self.request.query_params.get('near_city', '').strip()
+        qs     = Post.objects.select_related('author__profile').prefetch_related('topics', 'likes', 'comments')
+        params = self.request.query_params
+
+        scope    = params.get('scope')
+        topic    = params.get('topic')
+        location = params.get('location')
+        country  = params.get('country')
+        author   = params.get('author')
+        search   = params.get('search', '').strip()
 
         if scope:
             qs = qs.filter(scope=scope)
@@ -35,6 +41,8 @@ class PostListCreateView(generics.ListCreateAPIView):
             else:
                 qs = qs.filter(author_id=author, is_anonymous=False)
         if search:
+            if len(search) > _MAX_SEARCH_LEN:
+                raise ValidationError({'detail': f'Search term must be {_MAX_SEARCH_LEN} characters or fewer.'})
             from django.db.models import Q
             qs = qs.filter(
                 Q(body__icontains=search) |
@@ -42,24 +50,30 @@ class PostListCreateView(generics.ListCreateAPIView):
                 Q(location__icontains=search)
             ).distinct()
 
+        # Posts have an extra author.lives_in fallback score — handled inline here
+        # because it references a related field not available in the generic geo helper.
+        near_city = params.get('near_city', '').strip()
+        lat_raw   = params.get('lat')
+        lng_raw   = params.get('lng')
+
+        if lat_raw is not None and lng_raw is not None:
+            # delegate to shared helper (validates coords, annotates distance)
+            return apply_location_sort(qs, self.request)
+
         if near_city:
-            # Score posts by location relevance — city name extracted before the comma
-            # e.g. "Queens, NY" → city_prefix = "Queens"
             city_prefix = near_city.split(',')[0].strip()
-            qs = qs.annotate(
+            return qs.annotate(
                 loc_score=Case(
-                    When(location__iexact=near_city,         then=Value(4)),  # exact: "Queens, NY"
-                    When(location__istartswith=city_prefix,  then=Value(3)),  # "Queens…"
-                    When(location__icontains=city_prefix,    then=Value(2)),  # anywhere in location
-                    When(author__profile__lives_in__icontains=city_prefix, then=Value(1)),  # author lives near
+                    When(location__iexact=near_city,                       then=Value(4)),
+                    When(location__istartswith=city_prefix,                then=Value(3)),
+                    When(location__icontains=city_prefix,                  then=Value(2)),
+                    When(author__profile__lives_in__icontains=city_prefix, then=Value(1)),
                     default=Value(0),
                     output_field=IntegerField(),
                 )
             ).order_by('-loc_score', '-created_at')
-        else:
-            qs = qs.order_by('-created_at')
 
-        return qs
+        return qs.order_by('-created_at')
 
     def get_serializer_context(self):
         return {'request': self.request}
@@ -68,19 +82,13 @@ class PostListCreateView(generics.ListCreateAPIView):
         serializer.save(author=self.request.user)
 
 
-class PostDetailView(generics.RetrieveDestroyAPIView):
+class PostDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class   = PostSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly]
     queryset           = Post.objects.select_related('author__profile').prefetch_related('topics', 'likes', 'comments')
 
     def get_serializer_context(self):
         return {'request': self.request}
-
-    def destroy(self, request, *args, **kwargs):
-        post = self.get_object()
-        if post.author != request.user:
-            return Response({'detail': 'Not allowed.'}, status=status.HTTP_403_FORBIDDEN)
-        return super().destroy(request, *args, **kwargs)
 
 
 @api_view(['POST'])
@@ -101,7 +109,6 @@ def toggle_like(request, pk):
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def saved_posts(request):
-    """Return all posts saved by the current user."""
     post_ids = SavedPost.objects.filter(user=request.user).values_list('post_id', flat=True)
     posts = (
         Post.objects
@@ -110,8 +117,7 @@ def saved_posts(request):
         .prefetch_related('topics', 'likes', 'comments')
         .order_by('-created_at')
     )
-    serializer = PostSerializer(posts, many=True, context={'request': request})
-    return Response(serializer.data)
+    return Response(PostSerializer(posts, many=True, context={'request': request}).data)
 
 
 @api_view(['POST'])

@@ -1,5 +1,8 @@
 import hmac
+import logging
 from datetime import timedelta
+
+logger = logging.getLogger(__name__)
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -8,19 +11,27 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.mail import send_mail
 from django.utils import timezone
 from rest_framework import permissions, status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 from .models import OTPVerification
 from .serializers import RegisterSerializer, UserSerializer, ProfileSerializer
+from .throttles import LoginRateThrottle, OTPSendRateThrottle
 
 OTP_RATE_LIMIT_SECONDS = 60  # minimum gap between OTP sends per email
 
 
+class ThrottledTokenObtainPairView(TokenObtainPairView):
+    """Login endpoint with per-IP rate limiting (10 attempts / minute)."""
+    throttle_classes = [LoginRateThrottle]
+
+
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
+@throttle_classes([OTPSendRateThrottle])
 def send_otp(request):
     email = request.data.get('email', '').strip().lower()
     if not email or '@' not in email:
@@ -114,6 +125,15 @@ def register(request):
     serializer = RegisterSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
+        # Send a welcome notification
+        from notifications.models import Notification
+        Notification.objects.create(
+            recipient=user,
+            sender=None,
+            type='system',
+            title='Welcome to Zabroad! 🎉',
+            body='Your profile is ready. Explore jobs, housing, attorneys, and connect with your community.',
+        )
         refresh = RefreshToken.for_user(user)
         return Response({
             'access':  str(refresh.access_token),
@@ -125,6 +145,7 @@ def register(request):
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
+@throttle_classes([OTPSendRateThrottle])
 def forgot_password(request):
     """Send a password-reset OTP to the given email (only if account exists)."""
     email = request.data.get('email', '').strip().lower()
@@ -198,11 +219,13 @@ def reset_password(request):
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 def logout(request):
+    refresh = request.data.get('refresh')
+    if not refresh:
+        return Response({'detail': 'Refresh token is required.'}, status=status.HTTP_400_BAD_REQUEST)
     try:
-        token = RefreshToken(request.data.get('refresh'))
-        token.blacklist()
-    except (TokenError, Exception):
-        pass
+        RefreshToken(refresh).blacklist()
+    except TokenError:
+        return Response({'detail': 'Token is invalid or already expired.'}, status=status.HTTP_400_BAD_REQUEST)
     return Response({'detail': 'Logged out.'}, status=status.HTTP_200_OK)
 
 

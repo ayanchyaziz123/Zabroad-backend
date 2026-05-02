@@ -15,6 +15,7 @@ class Post(models.Model):
     latitude     = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude    = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     country      = models.CharField(max_length=100, blank=True)   # author's home country, e.g. "Bangladesh"
+    image        = models.ImageField(upload_to='posts/', null=True, blank=True)
     scope        = models.CharField(max_length=20, choices=SCOPE_CHOICES, default='local')
     is_anonymous = models.BooleanField(default=False)
     created_at   = models.DateTimeField(auto_now_add=True)

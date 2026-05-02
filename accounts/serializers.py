@@ -1,6 +1,9 @@
+import re
 from django.contrib.auth.models import User
 from rest_framework import serializers
 from .models import Profile
+
+_HANDLE_RE = re.compile(r'^[a-zA-Z0-9_]{3,30}$')
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -17,6 +20,9 @@ class RegisterSerializer(serializers.ModelSerializer):
                   'handle', 'home_country', 'country_flag', 'lives_in', 'visa_status']
 
     def validate_handle(self, value):
+        value = value.lstrip('@').strip()
+        if not _HANDLE_RE.match(value):
+            raise serializers.ValidationError('Handle must be 3–30 characters: letters, numbers, and underscores only.')
         if Profile.objects.filter(handle=value).exists():
             raise serializers.ValidationError('Handle already taken.')
         return value
@@ -57,8 +63,8 @@ class ProfileSerializer(serializers.ModelSerializer):
 
     def validate_handle(self, value):
         value = value.lstrip('@').strip()
-        if not value:
-            raise serializers.ValidationError('Handle cannot be empty.')
+        if not _HANDLE_RE.match(value):
+            raise serializers.ValidationError('Handle must be 3–30 characters: letters, numbers, and underscores only.')
         qs = Profile.objects.filter(handle=value)
         if self.instance:
             qs = qs.exclude(pk=self.instance.pk)

@@ -2,7 +2,7 @@ from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.contrib.auth.models import User
-from .models import Conversation, Message
+from .models import Conversation
 from .serializers import ConversationSerializer, MessageSerializer
 
 
@@ -66,12 +66,15 @@ class MessageListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         convo_id = self.kwargs['convo_id']
+        # Verify the requesting user is a participant — prevents ID-guessing attacks
+        try:
+            convo = Conversation.objects.get(id=convo_id, participants=self.request.user)
+        except Conversation.DoesNotExist:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied()
         # Mark incoming messages as read
-        Message.objects.filter(
-            conversation_id=convo_id,
-            is_read=False,
-        ).exclude(sender=self.request.user).update(is_read=True)
-        return Message.objects.filter(conversation_id=convo_id)
+        convo.messages.filter(is_read=False).exclude(sender=self.request.user).update(is_read=True)
+        return convo.messages.all()
 
     def perform_create(self, serializer):
         convo_id = self.kwargs['convo_id']
