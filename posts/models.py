@@ -23,6 +23,11 @@ class Post(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        indexes  = [
+            models.Index(fields=['-created_at']),
+            models.Index(fields=['country', '-created_at']),
+            models.Index(fields=['author', '-created_at']),
+        ]
 
     def __str__(self):
         return f'{self.author.username}: {self.body[:60]}'

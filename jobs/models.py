@@ -15,17 +15,22 @@ class JobListing(models.Model):
     location     = models.CharField(max_length=200)
     description  = models.TextField()
     plan         = models.CharField(max_length=20, choices=PLAN_CHOICES, default='free')
-    home_country = models.CharField(max_length=100, blank=True)   # poster's home country name
-    country_flag = models.CharField(max_length=10,  blank=True)   # emoji flag
-    posted_from  = models.CharField(max_length=200, blank=True)   # poster's current city/area
+    home_country = models.CharField(max_length=100, blank=True, db_index=True)
+    country_flag = models.CharField(max_length=10,  blank=True)
+    posted_from  = models.CharField(max_length=200, blank=True)
+    image        = models.ImageField(upload_to='jobs/', null=True, blank=True)
     latitude     = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude    = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    is_hot       = models.BooleanField(default=False)
-    is_active    = models.BooleanField(default=True)
+    is_hot       = models.BooleanField(default=False, db_index=True)
+    is_active    = models.BooleanField(default=True,  db_index=True)
     created_at   = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['-created_at']
+        indexes  = [
+            models.Index(fields=['is_active', '-created_at']),
+            models.Index(fields=['home_country', 'is_active']),
+        ]
 
     def __str__(self):
         return f'{self.title} @ {self.company}'

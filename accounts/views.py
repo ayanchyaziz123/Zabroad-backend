@@ -21,7 +21,7 @@ from .models import OTPVerification
 from .serializers import RegisterSerializer, UserSerializer, ProfileSerializer
 from .throttles import LoginRateThrottle, OTPSendRateThrottle
 
-OTP_RATE_LIMIT_SECONDS = 60  # minimum gap between OTP sends per email
+OTP_RATE_LIMIT_SECONDS = 120  # minimum gap between OTP sends per email
 
 
 class ThrottledTokenObtainPairView(TokenObtainPairView):

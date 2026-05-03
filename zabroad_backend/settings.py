@@ -6,11 +6,10 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
 
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'fallback-insecure-key-change-in-production')
+SECRET_KEY = os.environ['DJANGO_SECRET_KEY']  # required — no insecure fallback
 DEBUG      = os.getenv('DEBUG', 'False') == 'True'
 
-_raw_hosts = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1')
-ALLOWED_HOSTS = [h.strip() for h in _raw_hosts.split(',')]
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',')
 
 
 INSTALLED_APPS = [
@@ -87,9 +86,10 @@ TIME_ZONE     = "UTC"
 USE_I18N      = True
 USE_TZ        = True
 
-STATIC_URL = "static/"
-MEDIA_URL  = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+STATIC_URL  = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+MEDIA_URL   = "/media/"
+MEDIA_ROOT  = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -118,23 +118,31 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticatedOrReadOnly",
     ),
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
-    "PAGE_SIZE": 20,
+    "PAGE_SIZE":     20,
+    "MAX_PAGE_SIZE": 100,
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
-        "anon":     "200/hour",
-        "user":     "2000/hour",
-        "login":    "10/minute",
-        "otp_send": "5/hour",
+        "anon":     "100/hour",
+        "user":     "1000/hour",
+        "login":    "5/minute",
+        "otp_send": "3/hour",
     },
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+    ] if not DEBUG else [
+        "rest_framework.renderers.JSONRenderer",
+        "rest_framework.renderers.BrowsableAPIRenderer",
+    ],
+    "EXCEPTION_HANDLER": "zabroad_backend.exceptions.custom_exception_handler",
 }
 
 # ── JWT ───────────────────────────────────────────────────────────────────────
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME":    timedelta(minutes=60),
-    "REFRESH_TOKEN_LIFETIME":   timedelta(days=30),
+    "ACCESS_TOKEN_LIFETIME":    timedelta(minutes=30),
+    "REFRESH_TOKEN_LIFETIME":   timedelta(days=7),
     "ROTATE_REFRESH_TOKENS":    True,
     "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN":        True,
@@ -142,11 +150,12 @@ SIMPLE_JWT = {
 }
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
-if os.getenv('CORS_ALLOW_ALL_ORIGINS', 'False') == 'True':
-    CORS_ALLOW_ALL_ORIGINS = True
+_cors_origins = os.getenv('CORS_ALLOWED_ORIGINS', '')
+if _cors_origins:
+    CORS_ALLOWED_ORIGINS    = [o.strip() for o in _cors_origins.split(',')]
+    CORS_ALLOW_ALL_ORIGINS  = False
 else:
-    _origins = os.getenv('CORS_ALLOWED_ORIGINS', '')
-    CORS_ALLOWED_ORIGINS = [o.strip() for o in _origins.split(',') if o.strip()]
+    CORS_ALLOW_ALL_ORIGINS  = True   # dev fallback only — set CORS_ALLOWED_ORIGINS in production
 
 # ── Email ─────────────────────────────────────────────────────────────────────
 EMAIL_BACKEND      = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
@@ -160,6 +169,40 @@ EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
 # ── Stripe ────────────────────────────────────────────────────────────────────
 STRIPE_SECRET_KEY      = os.getenv('STRIPE_SECRET_KEY', '')
 STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY', '')
+
+# ── Logging ───────────────────────────────────────────────────────────────────
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{levelname}] {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'WARNING',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': os.getenv('DJANGO_LOG_LEVEL', 'WARNING'),
+            'propagate': False,
+        },
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+    },
+}
 
 # ── Auth backends ─────────────────────────────────────────────────────────────
 AUTHENTICATION_BACKENDS = [
