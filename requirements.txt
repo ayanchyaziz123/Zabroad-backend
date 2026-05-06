@@ -21,3 +21,6 @@ psycopg2-binary>=2.9
 # Media file storage (Cloudflare R2 / AWS S3)
 django-storages[s3]>=1.14
 boto3>=1.34
+
+# Stripe payments
+stripe>=8.0
