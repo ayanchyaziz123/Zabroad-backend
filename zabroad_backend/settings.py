@@ -17,6 +17,7 @@ if railway_host := os.getenv('RAILWAY_PUBLIC_DOMAIN'):
     ALLOWED_HOSTS.append(railway_host)
 if render_host := os.getenv('RENDER_EXTERNAL_HOSTNAME'):
     ALLOWED_HOSTS.append(render_host)
+ALLOWED_HOSTS.append('healthcheck.railway.app')
 
 
 INSTALLED_APPS = [
