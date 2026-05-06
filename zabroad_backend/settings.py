@@ -10,9 +10,11 @@ load_dotenv(BASE_DIR / '.env')
 SECRET_KEY = os.environ['DJANGO_SECRET_KEY']  # required — no insecure fallback
 DEBUG      = os.getenv('DEBUG', 'False') == 'True'
 
-# Render auto-sets RENDER_EXTERNAL_HOSTNAME; also honour explicit ALLOWED_HOSTS env var
+# Honour explicit ALLOWED_HOSTS env var first, then auto-detect Railway/Render hostnames
 _allowed = os.getenv('ALLOWED_HOSTS', '')
 ALLOWED_HOSTS = [h.strip() for h in _allowed.split(',') if h.strip()] if _allowed else ['*']
+if railway_host := os.getenv('RAILWAY_PUBLIC_DOMAIN'):
+    ALLOWED_HOSTS.append(railway_host)
 if render_host := os.getenv('RENDER_EXTERNAL_HOSTNAME'):
     ALLOWED_HOSTS.append(render_host)
 
