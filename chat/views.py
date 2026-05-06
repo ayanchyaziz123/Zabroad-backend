@@ -84,3 +84,24 @@ class MessageListCreateView(generics.ListCreateAPIView):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied()
         serializer.save(sender=self.request.user, conversation=convo)
+
+
+@api_view(['DELETE'])
+@permission_classes([permissions.IsAuthenticated])
+def delete_conversation(request, convo_id):
+    deleted, _ = Conversation.objects.filter(id=convo_id, participants=request.user).delete()
+    if not deleted:
+        return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['DELETE'])
+@permission_classes([permissions.IsAuthenticated])
+def delete_message(request, convo_id, msg_id):
+    from .models import Message
+    try:
+        msg = Message.objects.get(id=msg_id, conversation__id=convo_id, sender=request.user)
+    except Message.DoesNotExist:
+        return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+    msg.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)

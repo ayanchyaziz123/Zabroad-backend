@@ -251,6 +251,31 @@ def public_profile(request, user_id):
     })
 
 
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def change_password(request):
+    old_password = request.data.get('old_password', '').strip()
+    new_password = request.data.get('new_password', '').strip()
+
+    if not old_password or not new_password:
+        return Response({'detail': 'Both old and new passwords are required.'}, status=status.HTTP_400_BAD_REQUEST)
+    if len(new_password) < 8:
+        return Response({'detail': 'New password must be at least 8 characters.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    user = request.user
+    if not user.check_password(old_password):
+        return Response({'detail': 'Current password is incorrect.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        validate_password(new_password, user=user)
+    except DjangoValidationError as e:
+        return Response({'detail': ' '.join(e.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
+    user.set_password(new_password)
+    user.save()
+    return Response({'detail': 'Password changed successfully.'})
+
+
 @api_view(['GET', 'PATCH'])
 @permission_classes([permissions.IsAuthenticated])
 def me(request):

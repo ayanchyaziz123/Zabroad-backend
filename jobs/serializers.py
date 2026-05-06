@@ -12,7 +12,7 @@ class JobListingSerializer(serializers.ModelSerializer):
         model  = JobListing
         fields = [
             'id', 'poster', 'poster_id',
-            'title', 'company', 'location',
+            'title', 'company', 'location', 'category',
             'latitude', 'longitude',
             'description', 'plan', 'home_country', 'country_flag',
             'posted_from', 'image', 'image_url',

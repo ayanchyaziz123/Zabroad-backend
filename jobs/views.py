@@ -18,6 +18,9 @@ class JobListCreateView(generics.ListCreateAPIView):
 
         if country:
             qs = qs.filter(home_country__iexact=country)
+        category = params.get('category', '').strip()
+        if category and category != 'all':
+            qs = qs.filter(category=category)
         if search:
             qs = qs.filter(
                 Q(title__icontains=search) |

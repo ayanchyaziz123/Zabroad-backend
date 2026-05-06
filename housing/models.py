@@ -8,12 +8,23 @@ class HousingListing(models.Model):
         ('standard', 'Standard'),
         ('premium',  'Premium'),
     ]
+    CATEGORY_CHOICES = [
+        ('apartment',  'Apartment'),
+        ('house',      'House'),
+        ('room',       'Room'),
+        ('studio',     'Studio'),
+        ('condo',      'Condo'),
+        ('shared',     'Shared Housing'),
+        ('commercial', 'Commercial'),
+        ('other',      'Other'),
+    ]
 
     posted_by       = models.ForeignKey(User, on_delete=models.CASCADE, related_name='housing')
     title           = models.CharField(max_length=200)
     price           = models.CharField(max_length=50)          # e.g. "$1,450/mo"
     location        = models.CharField(max_length=200)
     description     = models.TextField()
+    category        = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default='other')
     plan            = models.CharField(max_length=20, choices=PLAN_CHOICES, default='free')
     home_country    = models.CharField(max_length=100, blank=True, db_index=True)
     country_flag    = models.CharField(max_length=10,  blank=True)

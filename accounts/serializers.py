@@ -86,12 +86,12 @@ class ProfileSerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
-    profile = ProfileSerializer(read_only=True)
-    name    = serializers.SerializerMethodField()
+    profile    = ProfileSerializer(read_only=True)
+    name       = serializers.SerializerMethodField()
 
     class Meta:
         model  = User
-        fields = ['id', 'name', 'email', 'profile']
+        fields = ['id', 'name', 'first_name', 'last_name', 'email', 'profile']
 
     def get_name(self, obj):
         return obj.get_full_name() or obj.username
