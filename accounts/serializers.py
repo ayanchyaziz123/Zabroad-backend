@@ -12,12 +12,11 @@ class RegisterSerializer(serializers.ModelSerializer):
     home_country = serializers.CharField(default='Bangladesh')
     country_flag = serializers.CharField(default='🇧🇩')
     lives_in     = serializers.CharField(default='Queens, NY')
-    visa_status  = serializers.CharField(default='OPT')
 
     class Meta:
         model  = User
         fields = ['first_name', 'last_name', 'email', 'password',
-                  'handle', 'home_country', 'country_flag', 'lives_in', 'visa_status']
+                  'handle', 'home_country', 'country_flag', 'lives_in']
 
     def validate_handle(self, value):
         value = value.lstrip('@').strip()
@@ -35,7 +34,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         profile_fields = {
             k: validated_data.pop(k)
-            for k in ['handle', 'home_country', 'country_flag', 'lives_in', 'visa_status']
+            for k in ['handle', 'home_country', 'country_flag', 'lives_in']
         }
         password = validated_data.pop('password')
         user = User(**validated_data)
@@ -55,7 +54,7 @@ class ProfileSerializer(serializers.ModelSerializer):
         fields = ['handle', 'avatar_emoji', 'avatar', 'cover',
                   'avatar_url', 'cover_url',
                   'home_country', 'country_flag',
-                  'lives_in', 'visa_status', 'bio']
+                  'lives_in', 'bio']
         extra_kwargs = {
             'avatar': {'write_only': True, 'required': False},
             'cover':  {'write_only': True, 'required': False},

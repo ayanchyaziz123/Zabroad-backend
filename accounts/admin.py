@@ -12,7 +12,7 @@ class OTPVerificationAdmin(admin.ModelAdmin):
 
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
-    list_display  = ['handle', 'user', 'home_country', 'lives_in', 'visa_status', 'created_at']
-    list_filter   = ['visa_status']
+    list_display  = ['handle', 'user', 'home_country', 'lives_in', 'created_at']
+    list_filter   = ['home_country']
     search_fields = ['handle', 'user__email', 'user__first_name']
     readonly_fields = ['created_at']

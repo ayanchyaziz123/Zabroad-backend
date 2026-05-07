@@ -36,12 +36,6 @@ class OTPVerification(models.Model):
 
 
 class Profile(models.Model):
-    VISA_CHOICES = [
-        ('OPT', 'OPT'), ('CPT', 'CPT'), ('H1B', 'H-1B'), ('H4', 'H-4 EAD'),
-        ('L1', 'L-1'), ('O1', 'O-1'), ('GC', 'Green Card'), ('CITIZEN', 'Citizen'),
-        ('F1', 'F-1'), ('ASYLUM', 'Asylum'), ('OTHER', 'Other'),
-    ]
-
     user         = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     handle       = models.CharField(max_length=50, unique=True)
     avatar_emoji = models.CharField(max_length=10, default='🧑‍💻')
@@ -50,7 +44,6 @@ class Profile(models.Model):
     home_country = models.CharField(max_length=100, default='Bangladesh')
     country_flag = models.CharField(max_length=10, default='🇧🇩')
     lives_in     = models.CharField(max_length=100, blank=True, default='')
-    visa_status  = models.CharField(max_length=20, choices=VISA_CHOICES, default='OPT')
     bio          = models.TextField(blank=True)
     created_at   = models.DateTimeField(auto_now_add=True)
 

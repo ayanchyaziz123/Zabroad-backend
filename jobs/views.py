@@ -32,7 +32,6 @@ class JobListCreateView(generics.ListCreateAPIView):
         return apply_location_sort(qs, self.request)
 
     def get_serializer_context(self):
-        print("api")
         return {'request': self.request}
 
     def perform_create(self, serializer):

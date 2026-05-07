@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     "chat",
     "notifications",
     "marketplace",
+    "ai",
 ]
 
 MIDDLEWARE = [
@@ -218,6 +219,9 @@ EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
 # ── Stripe ────────────────────────────────────────────────────────────────────
 STRIPE_SECRET_KEY      = os.getenv('STRIPE_SECRET_KEY', '')
 STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY', '')
+
+# ── Anthropic AI ──────────────────────────────────────────────────────────────
+ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 LOGGING = {

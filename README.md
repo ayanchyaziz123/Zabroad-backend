@@ -13,6 +13,7 @@ Built with Django 5 + Django REST Framework. Deployable to Railway (primary) or 
 | Framework | Django 5, Django REST Framework |
 | Auth | SimpleJWT (access + refresh tokens, blacklist) |
 | Database | PostgreSQL (production), SQLite (local dev) |
+| AI | Anthropic Claude (Haiku) via `anthropic` SDK |
 | Media Storage | Cloudflare R2 / AWS S3 via django-storages |
 | Static Files | WhiteNoise (compressed + cached) |
 | Server | Gunicorn |
@@ -26,14 +27,17 @@ Built with Django 5 + Django REST Framework. Deployable to Railway (primary) or 
 zabroad_backend/
 ├── accounts/          # Auth, OTP, user profiles
 ├── posts/             # Community feed, likes, comments, saves
-├── jobs/              # Job listings
-├── housing/           # Housing listings
+├── jobs/              # Job listings + Stripe payments
+├── housing/           # Housing listings + Stripe payments
 ├── marketplace/       # Buy/sell marketplace
 ├── healthcare/        # Doctor directory
-├── attorneys/         # Immigration attorney directory
+├── attorneys/         # Immigration attorney directory + Stripe payments
 ├── events/            # Community events + RSVP
 ├── chat/              # Direct messaging
 ├── notifications/     # In-app notifications
+├── ai/                # Claude AI immigration assistant
+│   ├── views.py       # /api/ai/chat/ endpoint
+│   └── urls.py
 └── zabroad_backend/   # Settings, URLs, shared utilities
     ├── settings.py
     ├── urls.py
@@ -62,6 +66,30 @@ zabroad_backend/
 | POST | `password/forgot/` | None | Send password-reset OTP |
 | POST | `password/reset/` | None | Verify OTP + set new password |
 | GET | `profile/<user_id>/` | Required | Get any user's public profile + posts |
+
+### AI Assistant — `/api/ai/`
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `chat/` | Required | Send message history → get Claude AI reply |
+
+**Request body:**
+```json
+{
+  "messages": [
+    { "role": "user", "content": "Can I work on OPT while applying for H-1B?" },
+    { "role": "assistant", "content": "Yes, here's how cap-gap works..." },
+    { "role": "user", "content": "What documents do I need?" }
+  ]
+}
+```
+
+**Response:**
+```json
+{ "reply": "Here are the documents you need for H-1B..." }
+```
+
+The AI automatically receives the user's visa status, home country, and current city as system context so responses are personalized.
 
 ### Posts — `/api/posts/`
 
@@ -179,6 +207,31 @@ Refresh token: 7 days (rotated on use, blacklisted after rotation)
 
 ---
 
+## AI Assistant
+
+The `/api/ai/chat/` endpoint proxies messages to Anthropic's Claude Haiku model.
+
+**How it works:**
+1. Frontend sends the full conversation history (array of `{role, content}` objects)
+2. Backend injects a system prompt that defines Zabroad AI's persona and expertise
+3. The authenticated user's profile (visa status, home country, city) is appended to the system prompt automatically — responses are personalized
+4. Claude Haiku returns a reply which is forwarded to the app
+
+**System prompt covers:**
+- All US visa types (OPT, STEM OPT, H-1B, H-4, L-1, O-1, F-1, Green Card, Asylum, DACA)
+- USCIS processes, form numbers, timelines, deadlines
+- Job search for immigrants (E-Verify, cap-gap, OPT-friendly employers)
+- Renting without US credit history or SSN
+- Healthcare options (FQHCs, OPT insurance, telehealth, GoodRx)
+- Banking, credit building, ITIN, taxes
+- Finding immigration attorneys and legal aid
+
+**Error handling:**
+- `503` — API key not configured
+- `429` — Claude rate limit hit, retry later
+
+---
+
 ## Rate Limits
 
 | Scope | Limit |
@@ -211,7 +264,7 @@ pip install -r requirements.txt
 
 # Configure environment
 cp .env.example .env
-# Edit .env — set DJANGO_SECRET_KEY at minimum
+# Edit .env — set DJANGO_SECRET_KEY and ANTHROPIC_API_KEY at minimum
 
 # Run migrations
 python manage.py migrate
@@ -234,6 +287,7 @@ Browsable API: enabled in DEBUG mode.
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `DJANGO_SECRET_KEY` | Yes | Django secret key |
+| `ANTHROPIC_API_KEY` | Yes | Anthropic API key for Claude AI — get at console.anthropic.com |
 | `DEBUG` | No | `True` for dev, `False` for prod (default: False) |
 | `DATABASE_URL` | No | Auto-injected by Railway/Render. Falls back to SQLite. |
 | `ALLOWED_HOSTS` | No | Comma-separated hosts. Auto-detected on Railway/Render. |
@@ -242,8 +296,8 @@ Browsable API: enabled in DEBUG mode.
 | `EMAIL_HOST` | No | SMTP host (default: smtp.gmail.com) |
 | `EMAIL_PORT` | No | SMTP port (default: 587) |
 | `EMAIL_USE_TLS` | No | (default: True) |
-| `EMAIL_HOST_USER` | No | SMTP username |
-| `EMAIL_HOST_PASSWORD` | No | SMTP password / app password |
+| `EMAIL_HOST_USER` | No | Gmail address for sending OTP emails |
+| `EMAIL_HOST_PASSWORD` | No | Gmail app password (16-char, generated in Google Account settings) |
 | `USE_S3` | No | Set `True` to enable R2/S3 media storage |
 | `AWS_ACCESS_KEY_ID` | If USE_S3 | R2 or S3 access key |
 | `AWS_SECRET_ACCESS_KEY` | If USE_S3 | R2 or S3 secret key |
@@ -261,7 +315,7 @@ Browsable API: enabled in DEBUG mode.
 2. Create a new Railway project → **Deploy from GitHub repo**.
 3. Set **Root Directory** to `zabroad_backend`.
 4. Add a **Postgres** plugin — Railway injects `DATABASE_URL` automatically.
-5. Set environment variables in Railway dashboard (minimum: `DJANGO_SECRET_KEY`, `DEBUG=False`, email config).
+5. Set environment variables in Railway dashboard (minimum: `DJANGO_SECRET_KEY`, `DEBUG=False`, `ANTHROPIC_API_KEY`, email config).
 6. Railway uses `railway.toml` (already configured) — build and deploy happens automatically.
 
 `RAILWAY_PUBLIC_DOMAIN` is auto-injected and added to `ALLOWED_HOSTS`.
@@ -276,6 +330,7 @@ Health check endpoint: `GET /api/auth/health/`
 - OTP comparison uses `hmac.compare_digest` (timing-attack safe)
 - JWT refresh tokens are blacklisted after rotation
 - Password reset uses the same OTP system — email enumeration protected (identical response whether account exists or not)
+- AI endpoint requires authentication — no anonymous AI access
 - Production security headers: HSTS, XSS filter, content-type nosniff, X-Frame-Options DENY
 - TLS termination handled at Railway/Render load balancer via `SECURE_PROXY_SSL_HEADER`
 - Per-endpoint throttling on login and OTP send
