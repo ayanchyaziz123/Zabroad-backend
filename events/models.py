@@ -15,6 +15,11 @@ class Event(models.Model):
     date        = models.DateTimeField()
     description = models.TextField()
     is_free     = models.BooleanField(default=True)
+    image       = models.ImageField(upload_to='events/', null=True, blank=True)
+    price       = models.CharField(max_length=50, blank=True, default='')  # e.g. "$10"
+    latitude    = models.FloatField(null=True, blank=True)
+    longitude   = models.FloatField(null=True, blank=True)
+    link        = models.URLField(blank=True, default='')   # registration/website link
     created_at  = models.DateTimeField(auto_now_add=True)
 
     class Meta:

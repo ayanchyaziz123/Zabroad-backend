@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     "chat",
     "notifications",
     "marketplace",
+    "local_shop",
     "ai",
 ]
 
