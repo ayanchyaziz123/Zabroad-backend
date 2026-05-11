@@ -1,4 +1,4 @@
-from django.db.models import Case, When, Value, IntegerField
+from django.db.models import Case, Count, When, Value, IntegerField
 from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.exceptions import ValidationError
@@ -17,7 +17,7 @@ class PostListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
-        qs     = Post.objects.select_related('author__profile').prefetch_related('topics', 'likes', 'comments')
+        qs     = Post.objects.select_related('author__profile').prefetch_related('topics', 'likes', 'comments').annotate(likes_count=Count('likes', distinct=True), comments_count=Count('comments', distinct=True))
         params = self.request.query_params
 
         scope    = params.get('scope')
@@ -85,7 +85,9 @@ class PostListCreateView(generics.ListCreateAPIView):
 class PostDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class   = PostSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly]
-    queryset           = Post.objects.select_related('author__profile').prefetch_related('topics', 'likes', 'comments')
+
+    def get_queryset(self):
+        return Post.objects.select_related('author__profile').prefetch_related('topics', 'likes', 'comments').annotate(likes_count=Count('likes', distinct=True), comments_count=Count('comments', distinct=True))
 
     def get_serializer_context(self):
         return {'request': self.request}
@@ -102,8 +104,8 @@ def toggle_like(request, pk):
     like, created = Like.objects.get_or_create(user=request.user, post=post)
     if not created:
         like.delete()
-        return Response({'liked': False, 'likes_count': post.likes_count})
-    return Response({'liked': True, 'likes_count': post.likes_count})
+        return Response({'liked': False, 'likes_count': post.likes.count()})
+    return Response({'liked': True, 'likes_count': post.likes.count()})
 
 
 @api_view(['GET'])
@@ -115,6 +117,7 @@ def saved_posts(request):
         .filter(id__in=post_ids)
         .select_related('author__profile')
         .prefetch_related('topics', 'likes', 'comments')
+        .annotate(likes_count=Count('likes', distinct=True), comments_count=Count('comments', distinct=True))
         .order_by('-created_at')
     )
     return Response(PostSerializer(posts, many=True, context={'request': request}).data)

@@ -55,21 +55,11 @@ class ProfileSerializer(serializers.ModelSerializer):
                   'avatar_url', 'cover_url',
                   'home_country', 'country_flag',
                   'lives_in', 'bio']
+        read_only_fields = ['handle']
         extra_kwargs = {
             'avatar': {'write_only': True, 'required': False},
             'cover':  {'write_only': True, 'required': False},
         }
-
-    def validate_handle(self, value):
-        value = value.lstrip('@').strip()
-        if not _HANDLE_RE.match(value):
-            raise serializers.ValidationError('Handle must be 3–30 characters: letters, numbers, and underscores only.')
-        qs = Profile.objects.filter(handle=value)
-        if self.instance:
-            qs = qs.exclude(pk=self.instance.pk)
-        if qs.exists():
-            raise serializers.ValidationError('This handle is already taken.')
-        return value
 
     def get_avatar_url(self, obj):
         if not obj.avatar:

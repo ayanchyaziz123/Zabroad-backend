@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "storages",
     # Local apps
+    "listings",
     "accounts",
     "posts",
     "jobs",
@@ -180,6 +181,7 @@ REST_FRAMEWORK = {
         "user":     "1000/hour",
         "login":    "5/minute",
         "otp_send": "3/hour",
+        "ai_chat":  "20/hour",
     },
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",

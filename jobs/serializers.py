@@ -1,15 +1,20 @@
 from rest_framework import serializers
-from .models import JobListing
+from listings.models import Listing, JobDetail
 
 
 class JobListingSerializer(serializers.ModelSerializer):
-    poster    = serializers.SerializerMethodField()
-    poster_id = serializers.SerializerMethodField()
-    image     = serializers.ImageField(required=False, allow_null=True, write_only=True)
-    image_url = serializers.SerializerMethodField()
+    poster      = serializers.SerializerMethodField()
+    poster_id   = serializers.SerializerMethodField()
+    image       = serializers.ImageField(required=False, allow_null=True, write_only=True)
+    image_url   = serializers.SerializerMethodField()
+    is_hot      = serializers.BooleanField(source='is_boosted', read_only=True)
+
+    # JobDetail fields — read via source dotted path, written via create/update
+    company     = serializers.CharField(source='job.company', max_length=200)
+    posted_from = serializers.CharField(source='job.posted_from', max_length=200, required=False, allow_blank=True, default='')
 
     class Meta:
-        model  = JobListing
+        model  = Listing
         fields = [
             'id', 'poster', 'poster_id',
             'title', 'company', 'location', 'category',
@@ -51,13 +56,23 @@ class JobListingSerializer(serializers.ModelSerializer):
         return v
 
     def create(self, validated_data):
-        validated_data['is_hot'] = validated_data.get('plan') == 'premium'
-        return super().create(validated_data)
+        job_data = validated_data.pop('job', {})
+        validated_data['listing_type'] = Listing.TYPE_JOB
+        validated_data['is_boosted']   = validated_data.get('plan') == 'premium'
+        listing = Listing.objects.create(**validated_data)
+        JobDetail.objects.create(listing=listing, **job_data)
+        return listing
 
     def update(self, instance, validated_data):
+        job_data = validated_data.pop('job', {})
         if 'plan' in validated_data:
-            validated_data['is_hot'] = validated_data['plan'] == 'premium'
+            validated_data['is_boosted'] = validated_data['plan'] == 'premium'
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
+        if job_data:
+            job = instance.job
+            for attr, value in job_data.items():
+                setattr(job, attr, value)
+            job.save()
         return instance

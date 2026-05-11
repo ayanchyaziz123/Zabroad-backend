@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from zabroad_backend.validators import validate_image_size, validate_image_type
 
 
 class Post(models.Model):
@@ -15,7 +16,7 @@ class Post(models.Model):
     latitude     = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude    = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     country      = models.CharField(max_length=100, blank=True)   # author's home country, e.g. "Bangladesh"
-    image        = models.ImageField(upload_to='posts/', null=True, blank=True)
+    image        = models.ImageField(upload_to='posts/', null=True, blank=True, validators=[validate_image_size, validate_image_type])
     scope        = models.CharField(max_length=20, choices=SCOPE_CHOICES, default='local')
     is_anonymous = models.BooleanField(default=False)
     created_at   = models.DateTimeField(auto_now_add=True)
@@ -31,14 +32,6 @@ class Post(models.Model):
 
     def __str__(self):
         return f'{self.author.username}: {self.body[:60]}'
-
-    @property
-    def likes_count(self):
-        return self.likes.count()
-
-    @property
-    def comments_count(self):
-        return self.comments.count()
 
 
 class PostTopic(models.Model):

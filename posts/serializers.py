@@ -131,6 +131,7 @@ class PostSerializer(serializers.ModelSerializer):
         return post
 
     def update(self, instance, validated_data):
+        validated_data.pop('is_anonymous', None)  # immutable after creation
         topics = validated_data.pop('topics', None)
         for attr, value in validated_data.items():
             setattr(instance, attr, value)

@@ -2,7 +2,7 @@ from django.db.models import Q
 from rest_framework import generics, permissions
 from zabroad_backend.permissions import IsOwnerOrReadOnly
 from zabroad_backend.geo import apply_location_sort
-from .models import MarketplaceListing
+from listings.models import Listing
 from .serializers import MarketplaceListingSerializer
 
 
@@ -11,14 +11,18 @@ class MarketplaceListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
-        qs      = MarketplaceListing.objects.filter(is_active=True).select_related('posted_by')
-        params  = self.request.query_params
-        country = params.get('community', '').strip()
-        search  = params.get('search',    '').strip()
+        qs = (
+            Listing.objects
+            .filter(listing_type=Listing.TYPE_MARKETPLACE, is_active=True)
+            .select_related('posted_by', 'marketplace')
+        )
+        params   = self.request.query_params
+        country  = params.get('community', '').strip()
+        search   = params.get('search', '').strip()
+        category = params.get('category', '').strip()
 
         if country:
             qs = qs.filter(home_country__iexact=country)
-        category = params.get('category', '').strip()
         if category and category != 'all':
             qs = qs.filter(category=category)
         if search:
@@ -40,7 +44,11 @@ class MarketplaceListCreateView(generics.ListCreateAPIView):
 class MarketplaceDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class   = MarketplaceListingSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly]
-    queryset           = MarketplaceListing.objects.filter(is_active=True)
+    queryset           = (
+        Listing.objects
+        .filter(listing_type=Listing.TYPE_MARKETPLACE, is_active=True)
+        .select_related('posted_by', 'marketplace')
+    )
 
     def get_serializer_context(self):
         return {'request': self.request}

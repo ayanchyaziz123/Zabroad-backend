@@ -74,6 +74,9 @@ class ConversationSerializer(serializers.ModelSerializer):
         }
 
     def get_unread_count(self, obj):
+        # Use annotation from the view queryset when available (avoids N+1)
+        if hasattr(obj, 'unread_count'):
+            return obj.unread_count
         request = self.context.get('request')
         if not request:
             return 0
@@ -83,7 +86,8 @@ class ConversationSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if not request:
             return None
-        other = obj.participants.exclude(id=request.user.id).first()
+        # participants__profile is prefetched in ConversationListView — no extra query
+        other = next((p for p in obj.participants.all() if p.id != request.user.id), None)
         if not other:
             return None
         avatar_url = None

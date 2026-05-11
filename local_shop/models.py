@@ -2,6 +2,7 @@
 
 from django.db import models
 from django.contrib.auth.models import User
+from zabroad_backend.validators import validate_image_size, validate_image_type
 
 
 class LocalShop(models.Model):
@@ -39,8 +40,8 @@ class LocalShop(models.Model):
     longitude      = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
 
     # Branding
-    logo           = models.ImageField(upload_to='shops/logos/', null=True, blank=True)
-    cover_image    = models.ImageField(upload_to='shops/covers/', null=True, blank=True)
+    logo           = models.ImageField(upload_to='shops/logos/',  null=True, blank=True, validators=[validate_image_size, validate_image_type])
+    cover_image    = models.ImageField(upload_to='shops/covers/', null=True, blank=True, validators=[validate_image_size, validate_image_type])
 
     # Shop Status
     is_verified    = models.BooleanField(default=False, db_index=True)
@@ -82,7 +83,7 @@ class ShopProduct(models.Model):
     category       = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default='other')
 
     stock_quantity = models.PositiveIntegerField(default=0)
-    image          = models.ImageField(upload_to='shops/products/', null=True, blank=True)
+    image          = models.ImageField(upload_to='shops/products/', null=True, blank=True, validators=[validate_image_size, validate_image_type])
 
     is_available   = models.BooleanField(default=True, db_index=True)
     created_at     = models.DateTimeField(auto_now_add=True)

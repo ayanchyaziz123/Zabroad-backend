@@ -1,9 +1,10 @@
 import anthropic
 from django.conf import settings
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+from .throttles import AiChatThrottle
 
 SYSTEM_PROMPT = """You are Zabroad AI, a warm and knowledgeable immigration and settlement assistant for immigrants living in the United States.
 
@@ -32,6 +33,7 @@ Guidelines:
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@throttle_classes([AiChatThrottle])
 def ai_chat(request):
     messages = request.data.get('messages', [])
     if not messages:

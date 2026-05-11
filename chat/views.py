@@ -1,3 +1,4 @@
+from django.db.models import Count, Q
 from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
@@ -17,10 +18,18 @@ class ConversationListView(generics.ListAPIView):
         return ctx
 
     def get_queryset(self):
+        user = self.request.user
         return (
             Conversation.objects
-            .filter(participants=self.request.user)
-            .prefetch_related('participants', 'messages')
+            .filter(participants=user)
+            .annotate(
+                unread_count=Count(
+                    'messages',
+                    filter=Q(messages__is_read=False) & ~Q(messages__sender=user),
+                    distinct=True,
+                )
+            )
+            .prefetch_related('participants__profile', 'messages')
             .distinct()
         )
 
@@ -31,12 +40,12 @@ def get_or_create_conversation(request):
     """Get or create a 1-to-1 conversation with another user."""
     other_id = request.data.get('user_id')
     if not other_id:
-        return Response({'error': 'user_id required.'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'detail': 'user_id required.'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
         other = User.objects.get(id=other_id)
     except User.DoesNotExist:
-        return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
 
     # Find existing 1-to-1 conversation between these two users
     convo = (

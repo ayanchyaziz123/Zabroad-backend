@@ -5,6 +5,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 
+stripe.api_key = settings.STRIPE_SECRET_KEY
+
 PLAN_AMOUNTS = {
     'standard': 499,   # $4.99 in cents
     'premium':  999,   # $9.99 in cents
@@ -17,9 +19,7 @@ def create_payment_intent(request):
     amount = PLAN_AMOUNTS.get(plan)
 
     if not amount:
-        return Response({'error': 'Invalid plan.'}, status=status.HTTP_400_BAD_REQUEST)
-
-    stripe.api_key = settings.STRIPE_SECRET_KEY
+        return Response({'detail': 'Invalid plan.'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
         intent = stripe.PaymentIntent.create(
@@ -32,4 +32,4 @@ def create_payment_intent(request):
             'publishable_key': settings.STRIPE_PUBLISHABLE_KEY,
         })
     except stripe.error.StripeError as e:
-        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)

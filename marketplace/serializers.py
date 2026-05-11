@@ -1,15 +1,21 @@
+import re
+from decimal import Decimal, InvalidOperation
 from rest_framework import serializers
-from .models import MarketplaceListing
+from listings.models import Listing, MarketplaceDetail
 
 
 class MarketplaceListingSerializer(serializers.ModelSerializer):
-    poster        = serializers.SerializerMethodField()
-    poster_id     = serializers.SerializerMethodField()
-    image_url     = serializers.SerializerMethodField()
-    image         = serializers.ImageField(required=False, allow_null=True, write_only=True)
+    poster    = serializers.SerializerMethodField()
+    poster_id = serializers.SerializerMethodField()
+    image_url = serializers.SerializerMethodField()
+    image     = serializers.ImageField(required=False, allow_null=True, write_only=True)
+    is_hot    = serializers.BooleanField(source='is_boosted', read_only=True)
+
+    # MarketplaceDetail fields
+    price = serializers.CharField(source='marketplace.price', max_length=50, required=False, allow_blank=True, default='')
 
     class Meta:
-        model  = MarketplaceListing
+        model  = Listing
         fields = [
             'id', 'poster', 'poster_id',
             'title', 'description', 'price', 'category',
@@ -44,14 +50,35 @@ class MarketplaceListingSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Description must be at least 10 characters.')
         return v
 
+    def validate_price(self, value):
+        if not value or str(value).strip() == '':
+            return None
+        cleaned = re.sub(r'[^\d.]', '', str(value))
+        if not cleaned:
+            return None
+        try:
+            return Decimal(cleaned)
+        except InvalidOperation:
+            return None
+
     def create(self, validated_data):
-        validated_data['is_hot'] = validated_data.get('plan') == 'premium'
-        return super().create(validated_data)
+        marketplace_data = validated_data.pop('marketplace', {})
+        validated_data['listing_type'] = Listing.TYPE_MARKETPLACE
+        validated_data['is_boosted']   = validated_data.get('plan') == 'premium'
+        listing = Listing.objects.create(**validated_data)
+        MarketplaceDetail.objects.create(listing=listing, **marketplace_data)
+        return listing
 
     def update(self, instance, validated_data):
+        marketplace_data = validated_data.pop('marketplace', {})
         if 'plan' in validated_data:
-            validated_data['is_hot'] = validated_data['plan'] == 'premium'
+            validated_data['is_boosted'] = validated_data['plan'] == 'premium'
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
+        if marketplace_data:
+            mp = instance.marketplace
+            for attr, value in marketplace_data.items():
+                setattr(mp, attr, value)
+            mp.save()
         return instance

@@ -21,6 +21,14 @@ class PostAdmin(admin.ModelAdmin):
     readonly_fields = ['created_at', 'updated_at']
     inlines         = [PostTopicInline, CommentInline]
 
+    @admin.display(description='Likes')
+    def likes_count(self, obj):
+        return obj.likes.count()
+
+    @admin.display(description='Comments')
+    def comments_count(self, obj):
+        return obj.comments.count()
+
 
 @admin.register(Comment)
 class CommentAdmin(admin.ModelAdmin):

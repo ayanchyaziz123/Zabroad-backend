@@ -1,5 +1,6 @@
 import hmac
 import logging
+import math
 from datetime import timedelta
 
 logger = logging.getLogger(__name__)
@@ -9,6 +10,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.mail import send_mail
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
@@ -45,7 +47,7 @@ def send_otp(request):
     if recent:
         seconds_since = (timezone.now() - recent.created_at).total_seconds()
         if seconds_since < OTP_RATE_LIMIT_SECONDS:
-            wait = int(OTP_RATE_LIMIT_SECONDS - seconds_since)
+            wait = math.ceil(OTP_RATE_LIMIT_SECONDS - seconds_since)
             return Response(
                 {'detail': f'Please wait {wait} seconds before requesting a new code.'},
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -213,6 +215,12 @@ def reset_password(request):
     user.save()
     otp.is_used = True
     otp.save(update_fields=['is_used'])
+
+    # Invalidate all existing sessions so stolen tokens can't be reused
+    from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
+    for token in OutstandingToken.objects.filter(user=user):
+        BlacklistedToken.objects.get_or_create(token=token)
+
     return Response({'detail': 'Password reset successfully. Please sign in.'})
 
 
@@ -238,12 +246,18 @@ def public_profile(request, user_id):
     except User.DoesNotExist:
         return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
 
+    from django.db.models import Count
     from posts.serializers import PostSerializer
     from posts.models import Post
 
-    posts = Post.objects.filter(
-        author=target, is_anonymous=False
-    ).select_related('author__profile').prefetch_related('topics', 'likes', 'comments').order_by('-created_at')
+    posts = (
+        Post.objects
+        .filter(author=target, is_anonymous=False)
+        .select_related('author__profile')
+        .prefetch_related('topics', 'likes', 'comments')
+        .annotate(likes_count=Count('likes', distinct=True), comments_count=Count('comments', distinct=True))
+        .order_by('-created_at')
+    )
 
     return Response({
         'user':  UserSerializer(target, context={'request': request}).data,
@@ -283,21 +297,23 @@ def me(request):
     if request.method == 'GET':
         return Response(UserSerializer(user, context={'request': request}).data)
 
-    # Update top-level User fields
-    user_fields = {}
-    if 'first_name' in request.data:
-        user_fields['first_name'] = request.data['first_name']
-    if 'last_name' in request.data:
-        user_fields['last_name'] = request.data['last_name']
-    if user_fields:
-        for field, value in user_fields.items():
-            setattr(user, field, value)
-        user.save(update_fields=list(user_fields.keys()))
-
-    # Update Profile fields
+    # Validate profile first so we don't save user fields if profile is invalid
     profile_serializer = ProfileSerializer(user.profile, data=request.data, partial=True, context={'request': request})
-    if profile_serializer.is_valid():
+    if not profile_serializer.is_valid():
+        return Response(profile_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    with transaction.atomic():
+        user_fields = {}
+        if 'first_name' in request.data:
+            user_fields['first_name'] = request.data['first_name']
+        if 'last_name' in request.data:
+            user_fields['last_name'] = request.data['last_name']
+        if user_fields:
+            for field, value in user_fields.items():
+                setattr(user, field, value)
+            user.save(update_fields=list(user_fields.keys()))
+
         profile_serializer.save()
-        user.refresh_from_db()
-        return Response(UserSerializer(user, context={'request': request}).data)
-    return Response(profile_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    user.refresh_from_db()
+    return Response(UserSerializer(user, context={'request': request}).data)

@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 import secrets
+from zabroad_backend.validators import validate_image_size, validate_image_type
 
 
 class OTPVerification(models.Model):
@@ -39,8 +40,8 @@ class Profile(models.Model):
     user         = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     handle       = models.CharField(max_length=50, unique=True)
     avatar_emoji = models.CharField(max_length=10, default='🧑‍💻')
-    avatar       = models.ImageField(upload_to='profiles/avatars/', null=True, blank=True)
-    cover        = models.ImageField(upload_to='profiles/covers/',  null=True, blank=True)
+    avatar       = models.ImageField(upload_to='profiles/avatars/', null=True, blank=True, validators=[validate_image_size, validate_image_type])
+    cover        = models.ImageField(upload_to='profiles/covers/',  null=True, blank=True, validators=[validate_image_size, validate_image_type])
     home_country = models.CharField(max_length=100, default='Bangladesh')
     country_flag = models.CharField(max_length=10, default='🇧🇩')
     lives_in     = models.CharField(max_length=100, blank=True, default='')
